@@ -2,13 +2,23 @@
 
 import { useEffect, useMemo, useState, useTransition } from "react";
 import { inputClass } from "@/components/auth-ui";
-import { createReservation } from "@/lib/actions/reservations";
+import { createReservation, updateReservation } from "@/lib/actions/reservations";
 import type { Person, Room } from "@/lib/data/schedule";
 import { hasOverlap, type GridReservation } from "@/lib/grid";
 import { TITLE_MAX_LENGTH, validateReservation } from "@/lib/reservation-validation";
 import { SLOT_COUNT, slotToTime } from "@/lib/slots";
 
-export type Draft = { key: number; roomId: number; date: string; startSlot: number; endSlot: number };
+/** reservationId가 있으면 기존 예약 수정, 없으면 새 예약 */
+export type Draft = {
+  key: number;
+  roomId: number;
+  date: string;
+  startSlot: number;
+  endSlot: number;
+  reservationId?: string;
+  title?: string;
+  attendeeIds?: string[];
+};
 
 const START_SLOTS = Array.from({ length: SLOT_COUNT }, (_, i) => i); // 0~17
 const MAX_SUGGESTIONS = 8;
@@ -37,8 +47,9 @@ export function ReservationModal({
   const [date, setDate] = useState(draft.date);
   const [startSlot, setStartSlot] = useState(draft.startSlot);
   const [endSlot, setEndSlot] = useState(draft.endSlot);
-  const [title, setTitle] = useState("");
-  const [attendeeIds, setAttendeeIds] = useState<string[]>([]);
+  const [title, setTitle] = useState(draft.title ?? "");
+  const [attendeeIds, setAttendeeIds] = useState<string[]>(draft.attendeeIds ?? []);
+  const editingId = draft.reservationId;
   const [query, setQuery] = useState("");
   const [serverMessage, setServerMessage] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -56,7 +67,7 @@ export function ReservationModal({
     { today, nowMinutes },
   );
   const errors = validation.ok ? {} : validation.errors;
-  const overlaps = date === viewDate && !errors.time && hasOverlap(reservations, roomId, startSlot, endSlot);
+  const overlaps = date === viewDate && !errors.time && hasOverlap(reservations.filter((r) => r.id !== editingId), roomId, startSlot, endSlot);
   const canSubmit = validation.ok && !overlaps && !pending;
 
   const peopleById = useMemo(() => new Map(people.map((p) => [p.id, p])), [people]);
@@ -77,7 +88,7 @@ export function ReservationModal({
     if (!validation.ok) return;
     setServerMessage(null);
     startTransition(async () => {
-      const result = await createReservation(validation.data);
+      const result = await (editingId ? updateReservation(editingId, validation.data) : createReservation(validation.data));
       if (result.ok) onClose();
       else setServerMessage(result.message);
     });
@@ -97,7 +108,7 @@ export function ReservationModal({
         className="max-h-full w-full max-w-md overflow-y-auto rounded-t-xl bg-white p-5 shadow-xl sm:rounded-xl"
       >
         <h3 id="reservation-modal-title" className="mb-4 text-lg font-semibold text-[#1e2a5a]">
-          회의실 예약
+          {editingId ? "예약 수정" : "회의실 예약"}
         </h3>
 
         <div className="space-y-3 text-sm">
@@ -247,7 +258,7 @@ export function ReservationModal({
             disabled={!canSubmit}
             className="rounded-md bg-[#1e2a5a] px-5 py-2 text-sm font-medium text-white hover:bg-[#2a3a78] disabled:cursor-not-allowed disabled:bg-zinc-400"
           >
-            {pending ? "예약 중…" : "예약"}
+            {editingId ? (pending ? "수정 중…" : "수정") : pending ? "예약 중…" : "예약"}
           </button>
         </div>
       </div>

@@ -9,6 +9,8 @@ export type CreateReservationResult =
   | { ok: true }
   | { ok: false; message: string; errors?: ReservationErrors };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 const OVERLAP_MESSAGE = "방금 예약되었습니다. 다른 시간을 선택하세요.";
 
 export async function createReservation(input: ReservationInput): Promise<CreateReservationResult> {
@@ -45,9 +47,47 @@ export async function createReservation(input: ReservationInput): Promise<Create
   return { ok: true };
 }
 
-export type CancelReservationResult = { ok: true } | { ok: false; message: string };
+/** 예약을 수정한다(본문 + 참석자). 권한은 DB(RLS)가, 겹침은 DB 제약이 최종 판정한다. */
+export async function updateReservation(id: string, input: ReservationInput): Promise<CreateReservationResult> {
+  if (!UUID_PATTERN.test(id)) return { ok: false, message: "잘못된 예약입니다." };
 
-const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims.sub) return { ok: false, message: "로그인이 필요합니다. 다시 로그인하세요." };
+
+  const now = getSeoulNow();
+  const parsed = validateReservation(input, { today: now.date, nowMinutes: now.minutes });
+  if (!parsed.ok) return { ok: false, message: "입력 내용을 확인하세요.", errors: parsed.errors };
+
+  const { roomId, date, startSlot, endSlot, title, attendeeIds } = parsed.data;
+  const { error } = await supabase.rpc("update_reservation", {
+    p_id: id,
+    p_room_id: roomId,
+    p_date: date,
+    p_start_slot: startSlot,
+    p_end_slot: endSlot,
+    p_title: title,
+    p_attendee_ids: attendeeIds,
+  });
+
+  if (error) {
+    if (error.code === "23P01") return { ok: false, message: OVERLAP_MESSAGE };
+    if (error.code === "23503") return { ok: false, message: "선택한 회의실 또는 참석자를 찾을 수 없습니다." };
+    if (error.message === "past_time") return { ok: false, message: "지난 시간으로는 수정할 수 없습니다." };
+    if (error.message === "no_attendees") return { ok: false, message: "참석자를 1명 이상 선택하세요." };
+    if (error.message === "not_found") {
+      return { ok: false, message: "수정할 수 없습니다. 이미 취소됐거나 예약자·참석자가 아닙니다." };
+    }
+    console.error("update_reservation failed:", error.code, error.message);
+    return { ok: false, message: "수정에 실패했습니다. 잠시 후 다시 시도하세요." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/my");
+  return { ok: true };
+}
+
+export type CancelReservationResult = { ok: true } | { ok: false; message: string };
 
 /** 예약을 취소(삭제)한다. 예약자·참석자만 가능하며, 권한은 DB의 RLS가 최종 판정한다. */
 export async function cancelReservation(id: string): Promise<CancelReservationResult> {

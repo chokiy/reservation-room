@@ -11,11 +11,14 @@ export function ReservationDetailModal({
   reservation,
   room,
   canEdit,
+  onEdit,
   onClose,
 }: {
   reservation: ReservationDetail;
   room: Room | undefined;
   canEdit: boolean;
+  /** 있으면 [수정] 버튼을 보인다(시간이 지난 예약 등 수정할 수 없으면 넘기지 않는다) */
+  onEdit?: () => void;
   onClose: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
@@ -80,7 +83,7 @@ export function ReservationDetailModal({
         </dl>
 
         {!canEdit && (
-          <p className="mt-4 text-xs text-zinc-500">예약자와 참석자만 예약을 취소할 수 있습니다.</p>
+          <p className="mt-4 text-xs text-zinc-500">예약자와 참석자만 예약을 수정·취소할 수 있습니다.</p>
         )}
 
         <div className="mt-5 flex items-center justify-end gap-2">
@@ -113,6 +116,15 @@ export function ReservationDetailModal({
                   className="mr-auto rounded-md border border-red-300 px-4 py-2 text-sm text-red-700 hover:bg-red-50"
                 >
                   예약 취소
+                </button>
+              )}
+              {canEdit && onEdit && (
+                <button
+                  type="button"
+                  onClick={onEdit}
+                  className="rounded-md bg-[#1e2a5a] px-4 py-2 text-sm font-medium text-white hover:bg-[#2a3a78]"
+                >
+                  수정
                 </button>
               )}
               <button

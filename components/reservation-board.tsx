@@ -7,7 +7,7 @@ import { ReservationModal, type Draft } from "@/components/reservation-modal";
 import { ScheduleGrid } from "@/components/schedule-grid";
 import { canEditReservation } from "@/lib/permissions";
 import type { Person, ReservationDetail, Room } from "@/lib/data/schedule";
-import { defaultEndSlot, type RoomStatus } from "@/lib/grid";
+import { defaultEndSlot, isPastSlot, type RoomStatus } from "@/lib/grid";
 import { minutesToCurrentSlot } from "@/lib/slots";
 
 /** 현황 그리드·"지금 비어있는 방" 띠·예약 창을 묶는다. 예약 창은 열릴 때마다 새로 시작한다. */
@@ -75,6 +75,25 @@ export function ReservationBoard({
           reservation={detail}
           room={rooms.find((r) => r.id === detail.roomId)}
           canEdit={canEditReservation(userId, detail)}
+          onEdit={
+            // 이미 끝난 예약은 수정할 수 없다(취소는 가능).
+            isPastSlot(detail.date, today, detail.startSlot, nowMinutes)
+              ? undefined
+              : () => {
+                  nextKey.current += 1;
+                  setDraft({
+                    key: nextKey.current,
+                    roomId: detail.roomId,
+                    date: detail.date,
+                    startSlot: detail.startSlot,
+                    endSlot: detail.endSlot,
+                    reservationId: detail.id,
+                    title: detail.title,
+                    attendeeIds: detail.attendees.map((p) => p.id),
+                  });
+                  setDetailId(null);
+                }
+          }
           onClose={() => setDetailId(null)}
         />
       )}

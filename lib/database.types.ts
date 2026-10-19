@@ -181,6 +181,18 @@ export type Database = {
         }
         Returns: string
       }
+      update_reservation: {
+        Args: {
+          p_attendee_ids: string[]
+          p_date: string
+          p_end_slot: number
+          p_id: string
+          p_room_id: number
+          p_start_slot: number
+          p_title: string
+        }
+        Returns: undefined
+      }
     }
     Enums: {
       [_ in never]: never
