@@ -30,6 +30,7 @@ export function ScheduleGrid({
   reservations,
   statuses,
   onSelect,
+  onOpenReservation,
 }: {
   date: string;
   today: string;
@@ -40,6 +41,8 @@ export function ScheduleGrid({
   statuses: RoomStatus[] | null;
   /** 빈 칸을 클릭/드래그해서 구간(start 포함, end 제외)을 골랐을 때 */
   onSelect: (roomId: number, startSlot: number, endSlot: number) => void;
+  /** 예약 블록을 눌러 상세를 열 때 */
+  onOpenReservation: (reservationId: string) => void;
 }) {
   const isToday = date === today;
   const busyByRoom = new Map(statuses?.map((s) => [s.roomId, s.busyWith]));
@@ -139,15 +142,18 @@ export function ScheduleGrid({
                 {roomReservations.map((r) => {
                   const { left, width } = blockLayout(r.startSlot, r.endSlot);
                   return (
-                    <div
+                    <button
+                      type="button"
                       key={r.id}
                       title={`${r.teamName} · ${r.title}`}
+                      aria-label={`예약 상세: ${r.title}`}
+                      onClick={() => onOpenReservation(r.id)}
                       style={{ left: `${left}%`, width: `${width}%`, backgroundColor: teamColor(r.teamId) }}
-                      className="absolute inset-y-1 overflow-hidden rounded-md px-1.5 py-0.5 text-xs leading-tight text-white"
+                      className="absolute inset-y-1 cursor-pointer overflow-hidden rounded-md px-1.5 py-0.5 text-left text-xs leading-tight text-white hover:brightness-110"
                     >
                       <div className="truncate font-medium">{r.title}</div>
                       <div className="truncate text-[10px] opacity-90">{r.teamName}</div>
-                    </div>
+                    </button>
                   );
                 })}
 

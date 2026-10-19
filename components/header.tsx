@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { connection } from "next/server";
 import { logout } from "@/lib/actions/auth";
 import { createClient } from "@/lib/supabase/server";
@@ -37,7 +38,14 @@ export async function UserMenu() {
 export function Header({ userMenu }: { userMenu: React.ReactNode }) {
   return (
     <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-4 py-3">
-      <h1 className="text-lg font-semibold text-[#1e2a5a]">회의실 예약</h1>
+      <div className="flex items-center gap-4">
+        <h1 className="text-lg font-semibold text-[#1e2a5a]">
+          <Link href="/">회의실 예약</Link>
+        </h1>
+        <Link href="/my" className="text-sm text-zinc-600 hover:text-[#1e2a5a]">
+          내 예약
+        </Link>
+      </div>
       {userMenu}
     </header>
   );

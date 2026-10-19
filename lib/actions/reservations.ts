@@ -44,3 +44,30 @@ export async function createReservation(input: ReservationInput): Promise<Create
   revalidatePath("/");
   return { ok: true };
 }
+
+export type CancelReservationResult = { ok: true } | { ok: false; message: string };
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** 예약을 취소(삭제)한다. 예약자·참석자만 가능하며, 권한은 DB의 RLS가 최종 판정한다. */
+export async function cancelReservation(id: string): Promise<CancelReservationResult> {
+  if (!UUID_PATTERN.test(id)) return { ok: false, message: "잘못된 예약입니다." };
+
+  const supabase = await createClient();
+  const { data: claims } = await supabase.auth.getClaims();
+  if (!claims?.claims.sub) return { ok: false, message: "로그인이 필요합니다. 다시 로그인하세요." };
+
+  // RLS가 막으면 오류 없이 0행이 지워지므로 지운 행을 돌려받아 확인한다.
+  const { data, error } = await supabase.from("reservations").delete().eq("id", id).select("id");
+  if (error) {
+    console.error("cancel reservation failed:", error.code, error.message);
+    return { ok: false, message: "취소에 실패했습니다. 잠시 후 다시 시도하세요." };
+  }
+  if (data.length === 0) {
+    return { ok: false, message: "취소할 수 없습니다. 이미 취소됐거나 예약자·참석자가 아닙니다." };
+  }
+
+  revalidatePath("/");
+  revalidatePath("/my");
+  return { ok: true };
+}
