@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>회의실 예약 - 목업</title>
+<style>
+  :root { --navy:#1e2a5a; --green:#16a34a; --orange:#ea580c; --line:#e5e7eb; --slot:34px; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,'Malgun Gothic',sans-serif; color:#111827; background:#f8fafc; }
+  header { display:flex; justify-content:space-between; align-items:center; padding:12px 20px; background:#fff; border-bottom:1px solid var(--line); }
+  header b { color:var(--navy); font-size:18px; }
+  header span { font-size:14px; color:#4b5563; }
+  main { padding:16px 20px; max-width:1200px; margin:0 auto; }
+  .now { background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:10px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; font-size:14px; }
+  .now.off { background:#f3f4f6; border-color:var(--line); color:#6b7280; }
+  .chip { background:#fff; border:1px solid var(--green); color:var(--green); border-radius:999px; padding:4px 12px; cursor:pointer; font-size:13px; }
+  .chip:hover { background:var(--green); color:#fff; }
+  .datebar { display:flex; align-items:center; gap:10px; margin:14px 0; flex-wrap:wrap; }
+  .datebar button, .datebar input { border:1px solid var(--line); background:#fff; border-radius:6px; padding:6px 12px; cursor:pointer; font-size:14px; font-family:inherit; }
+  .datebar h2 { margin:0; font-size:18px; color:var(--navy); min-width:150px; text-align:center; }
+  .board { background:#fff; border:1px solid var(--line); border-radius:10px; overflow-x:auto; }
+  .row { display:flex; border-bottom:1px solid var(--line); }
+  .row:last-child { border-bottom:0; }
+  .name { position:sticky; left:0; z-index:2; background:#fff; flex:0 0 96px; padding:0 10px; display:flex; align-items:center; gap:6px; font-size:14px; border-right:1px solid var(--line); height:44px; }
+  .dot { width:9px; height:9px; border-radius:50%; background:#d1d5db; }
+  .cells { position:relative; display:flex; }
+  .cell { flex:0 0 var(--slot); height:44px; border-right:1px dotted var(--line); cursor:pointer; }
+  .cell:nth-child(2n) { border-right:1px solid var(--line); }
+  .cell:hover { background:#dbeafe; }
+  .cell.past { background:#f3f4f6; cursor:not-allowed; }
+  .cell.past:hover { background:#f3f4f6; }
+  .res { position:absolute; top:3px; height:38px; border-radius:6px; padding:3px 7px; font-size:12px; line-height:1.25; color:#fff; overflow:hidden; cursor:pointer; white-space:nowrap; }
+  .res small { display:block; opacity:.9; }
+  .head .cell { height:30px; font-size:12px; color:#6b7280; cursor:default; display:flex; align-items:center; padding-left:4px; }
+  .head .cell:hover { background:transparent; }
+  .head .name { height:30px; }
+  .nowline { position:absolute; top:0; bottom:0; width:2px; background:#ef4444; z-index:1; pointer-events:none; }
+  .legend { margin-top:10px; font-size:13px; color:#6b7280; }
+  .modal-bg { display:none; position:fixed; inset:0; z-index:100; background:rgba(0,0,0,.4); align-items:center; justify-content:center; }
+  .modal-bg.on { display:flex; }
+  .modal { background:#fff; border-radius:12px; padding:20px; width:min(420px,92vw); max-height:94vh; overflow:auto; }
+  .modal h3 { margin:0 0 12px; color:var(--navy); }
+  .modal label { display:block; font-size:13px; margin:10px 0 4px; color:#4b5563; }
+  .modal input, .modal select { width:100%; padding:8px; border:1px solid var(--line); border-radius:6px; font-size:14px; }
+  .tags span { display:inline-block; background:#e0e7ff; color:var(--navy); border-radius:999px; padding:3px 10px; font-size:12px; margin:2px 4px 2px 0; }
+  .btns { display:flex; justify-content:flex-end; gap:8px; margin-top:16px; }
+  .btns button { padding:8px 16px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; }
+  .btns .primary { background:var(--navy); color:#fff; border-color:var(--navy); }
+  .btns .primary:disabled { background:#9ca3af; border-color:#9ca3af; cursor:not-allowed; }
+  .note { font-size:12px; color:#9ca3af; margin-top:6px; }
+</style>
+</head>
+<body>
+<header><b>회의실 예약</b><span>민수 (기획팀) ▾ &nbsp;|&nbsp; 내 예약</span></header>
+<main>
+  <div class="now" id="nowband"></div>
+  <div class="datebar">
+    <button id="prev">◀</button><h2 id="datetitle"></h2><button id="next">▶</button>
+    <button id="today">오늘</button>
+    <input type="date" id="picker" title="날짜 선택">
+  </div>
+  <div class="board" id="board"></div>
+  <div class="legend">색 블록 = 예약됨 (칸을 누르면 상세·수정·취소) · 흰 칸 = 빈 시간 (클릭해서 예약) · 회색 = 지난 시간 · 빨간 선 = 현재 시각<br>
+  ※ 목업입니다. 데이터는 가짜이고, 오늘은 2026-10-22, 현재 시각은 13:10으로 고정했습니다. 가짜 예약은 10/22와 10/23에만 있습니다.</div>
+</main>
+
+<div class="modal-bg" id="mbg">
+  <div class="modal">
+    <h3>회의실 예약</h3>
+    <label>회의실</label>
+    <select id="mroom"></select>
+    <label>날짜</label>
+    <input type="date" id="mdate">
+    <label>시작 ~ 종료 시간</label>
+    <div style="display:flex;gap:8px;align-items:center">
+      <select id="mstart"></select> ~ <select id="mend"></select>
+    </div>
+    <div class="note" id="mmsg" style="color:#dc2626"></div>
+    <label>제목 <span style="color:#dc2626">*</span></label>
+    <input id="ttl" placeholder="예) 스프린트 리뷰">
+    <label>참석자 <span style="color:#dc2626">*</span> (1명 이상)</label>
+    <select id="att"><option value="">참석자 추가...</option><option>지은 (개발팀)</option><option>하나 (영업팀)</option><option>준호 (HR팀)</option><option>수민 (기획팀)</option></select>
+    <div class="tags" id="tags"></div>
+    <div class="btns">
+      <button id="cancel">닫기</button>
+      <button class="primary" id="ok" disabled>예약</button>
+    </div>
+    <div class="note">제목과 참석자를 모두 입력해야 [예약] 버튼이 활성화됩니다.</div>
+  </div>
+</div>
+
+<script>
+const START = 8*60, SLOTS = 18, NOW = 13*60+10, TODAY = '2026-10-22';
+const teams = { 개발팀:'#2563eb', 영업팀:'#9333ea', 기획팀:'#0d9488', HR팀:'#be185d' };
+// [날짜, 방, 시작, 종료, 팀, 제목]
+const reservations = [
+  ['2026-10-22',1,'09:00','10:30','영업팀','주간 영업회의'],
+  ['2026-10-22',2,'08:30','10:00','개발팀','스탠드업'],
+  ['2026-10-22',2,'11:00','12:30','개발팀','코드 리뷰'],
+  ['2026-10-22',4,'08:00','09:30','HR팀','면접'],
+  ['2026-10-22',5,'13:00','14:30','영업팀','고객 미팅'],
+  ['2026-10-22',6,'09:00','11:00','기획팀','로드맵 워크숍'],
+  ['2026-10-22',8,'14:00','15:30','개발팀','아키텍처 논의'],
+  ['2026-10-22',10,'13:00','13:30','HR팀','1:1'],
+  ['2026-10-23',3,'10:00','12:00','기획팀','스프린트 리뷰'],
+  ['2026-10-23',7,'14:00','16:00','영업팀','분기 계획'],
+];
+const tm = s => { const [h,m]=s.split(':').map(Number); return h*60+m; };
+const fmt = m => String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0');
+const slotW = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--slot'));
+const DOW = ['일','월','화','수','목','금','토'];
+const ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const parse = s => new Date(s+'T00:00:00');
+const shift = (s,n) => { const d=parse(s); d.setDate(d.getDate()+n); return ymd(d); };
+
+const board = document.getElementById('board'), picker = document.getElementById('picker');
+let viewDate = TODAY;
+
+function render(){
+  const d = viewDate, isToday = d===TODAY, isPast = d<TODAY;
+  document.getElementById('datetitle').textContent = `${d} (${DOW[parse(d).getDay()]})`;
+  picker.value = d;
+  board.innerHTML = '';
+  let head = '<div class="row head"><div class="name">회의실</div><div class="cells">';
+  for (let i=0;i<SLOTS;i++) head += `<div class="cell">${i%2===0 ? fmt(START+i*30).slice(0,2) : ''}</div>`;
+  board.insertAdjacentHTML('beforeend', head+'</div></div>');
+
+  const free = [];
+  for (let r=1;r<=10;r++) {
+    const rs = reservations.filter(x=>x[0]===d && x[1]===r);
+    const busyNow = isToday && rs.some(x=>tm(x[2])<=NOW && NOW<tm(x[3]));
+    if (!busyNow) free.push(r);
+    const dotColor = isToday ? (busyNow?'var(--orange)':'var(--green)') : '#d1d5db';
+    let h = `<div class="row"><div class="name"><span class="dot" style="background:${dotColor}"></span>회의실${r}</div><div class="cells">`;
+    for (let i=0;i<SLOTS;i++) {
+      const t = START+i*30;
+      const past = isPast || (isToday && t+30<=NOW);
+      h += `<div class="cell ${past?'past':''}" data-room="${r}" data-t="${t}"></div>`;
+    }
+    rs.forEach(x => {
+      const left = (tm(x[2])-START)/30*slotW, w = (tm(x[3])-tm(x[2]))/30*slotW - 2;
+      h += `<div class="res" style="left:${left}px;width:${w}px;background:${teams[x[4]]}" title="${x[4]} · ${x[5]}">${x[5]}<small>${x[4]}</small></div>`;
+    });
+    if (isToday) h += `<div class="nowline" style="left:${(NOW-START)/30*slotW}px"></div>`;
+    board.insertAdjacentHTML('beforeend', h+'</div></div>');
+  }
+
+  const band = document.getElementById('nowband');
+  if (isToday) {
+    band.className = 'now';
+    band.innerHTML = `🟢 <b>지금 비어있는 방</b> <span>(현재 ${fmt(NOW)})</span> ` +
+      free.map(r=>`<span class="chip" data-room="${r}" data-t="${Math.ceil(NOW/30)*30}">회의실${r}</span>`).join(' ');
+  } else {
+    band.className = 'now off';
+    band.innerHTML = `선택한 날짜는 오늘이 아니라서 "지금 비어있는 방"은 오늘 화면에서만 표시됩니다. <a href="#" id="gotoday">오늘로 이동</a>`;
+    document.getElementById('gotoday').onclick = e => { e.preventDefault(); go(TODAY); };
+  }
+}
+function go(d){ if (d) { viewDate = d; render(); } }
+document.getElementById('prev').onclick = () => go(shift(viewDate,-1));
+document.getElementById('next').onclick = () => go(shift(viewDate,1));
+document.getElementById('today').onclick = () => go(TODAY);
+picker.onchange = () => go(picker.value);
+
+/* 예약 창 */
+const mbg = document.getElementById('mbg'), ttl = document.getElementById('ttl'), att = document.getElementById('att'),
+      tags = document.getElementById('tags'), ok = document.getElementById('ok'),
+      mroom = document.getElementById('mroom'), mdate = document.getElementById('mdate'),
+      mstart = document.getElementById('mstart'), mend = document.getElementById('mend'), mmsg = document.getElementById('mmsg');
+mdate.min = TODAY;
+for (let r=1;r<=10;r++) mroom.insertAdjacentHTML('beforeend',`<option value="${r}">회의실${r}</option>`);
+for (let i=0;i<SLOTS;i++) mstart.insertAdjacentHTML('beforeend',`<option value="${START+i*30}">${fmt(START+i*30)}</option>`);
+for (let i=1;i<=SLOTS;i++) mend.insertAdjacentHTML('beforeend',`<option value="${START+i*30}">${fmt(START+i*30)}</option>`);
+let chosen = [];
+function conflict(){
+  const r=+mroom.value, s=+mstart.value, e=+mend.value;
+  return reservations.find(x => x[0]===mdate.value && x[1]===r && tm(x[2])<e && s<tm(x[3]));
+}
+function check(){
+  const s=+mstart.value, e=+mend.value, c=conflict();
+  let msg='';
+  if (!mdate.value) msg='날짜를 선택하세요.';
+  else if (mdate.value < TODAY) msg='지난 날짜는 예약할 수 없습니다.';
+  else if (e<=s) msg='종료 시간은 시작 시간보다 늦어야 합니다.';
+  else if (mdate.value === TODAY && s<NOW) msg='지난 시간은 예약할 수 없습니다.';
+  else if (c) msg=`이미 예약됨: ${c[4]} · ${c[5]} (${c[2]}~${c[3]})`;
+  mmsg.textContent = msg;
+  ok.disabled = !(ttl.value.trim() && chosen.length && !msg);
+}
+function open(room,t){
+  chosen=[]; tags.innerHTML=''; ttl.value=''; att.value='';
+  mdate.value = viewDate < TODAY ? TODAY : viewDate;
+  mroom.value = room;
+  const first = mdate.value===TODAY ? Math.max(t, Math.ceil(NOW/30)*30) : t;
+  mstart.value = Math.min(first, START+(SLOTS-1)*30); mend.value = +mstart.value+30;
+  check();
+  mbg.classList.add('on');
+}
+[mdate,mroom,mstart,mend].forEach(el => el.addEventListener('change', () => {
+  if (el===mstart && +mend.value<=+mstart.value) mend.value = Math.min(+mstart.value+30, START+SLOTS*30);
+  check();
+}));
+document.addEventListener('click', e => {
+  const c = e.target.closest('.cell[data-room], .chip[data-room]');
+  if (c && !c.classList.contains('past')) open(c.dataset.room, +c.dataset.t);
+});
+ttl.addEventListener('input', check);
+att.addEventListener('change', () => {
+  if (att.value && !chosen.includes(att.value)) { chosen.push(att.value); tags.insertAdjacentHTML('beforeend',`<span>${att.value}</span>`); }
+  att.value=''; check();
+});
+document.getElementById('cancel').onclick = () => mbg.classList.remove('on');
+ok.onclick = () => {
+  // 목업: 저장하지 않지만 화면에는 바로 반영해서 보여준다
+  reservations.push([mdate.value, +mroom.value, fmt(+mstart.value), fmt(+mend.value), '기획팀', ttl.value.trim()]);
+  mbg.classList.remove('on');
+  go(mdate.value);
+};
+render();
+</script>
+</body>
+</html>
