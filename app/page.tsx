@@ -1,7 +1,19 @@
+import { Suspense } from "react";
+import { Header, UserMenu } from "@/components/header";
+
 export default function Home() {
   return (
-    <main className="flex flex-1 items-center justify-center bg-zinc-50">
-      <h1 className="text-2xl font-semibold text-[#1e2a5a]">회의실 예약</h1>
-    </main>
+    <>
+      <Header
+        userMenu={
+          <Suspense fallback={<span className="text-sm text-zinc-400">…</span>}>
+            <UserMenu />
+          </Suspense>
+        }
+      />
+      <main className="flex flex-1 items-center justify-center bg-zinc-50">
+        <p className="text-zinc-500">현황 그리드는 M3에서 만듭니다.</p>
+      </main>
+    </>
   );
 }
