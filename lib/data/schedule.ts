@@ -39,3 +39,17 @@ export async function getSchedule(date: string): Promise<Schedule> {
 
   return { rooms: roomsResult.data, reservations };
 }
+
+export type Person = { id: string; nickname: string; teamName: string };
+
+/** 참석자 검색용 사내 사용자 목록(다른 팀 포함). 로그인 사용자 전체 조회는 RLS가 허용한다. */
+export async function getPeople(): Promise<Person[]> {
+  const supabase = await createClient();
+  const { data, error } = await supabase.from("profiles").select("id, nickname, teams(name)").order("nickname");
+  if (error) throw new Error(`사용자 목록을 불러오지 못했습니다: ${error.message}`);
+
+  return data.map((row) => {
+    const team = Array.isArray(row.teams) ? row.teams[0] : row.teams;
+    return { id: row.id, nickname: row.nickname, teamName: team?.name ?? "" };
+  });
+}

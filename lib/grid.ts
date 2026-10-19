@@ -124,3 +124,46 @@ const TEAM_COLORS = ["#0d9488", "#2563eb", "#9333ea", "#be185d", "#b45309", "#4d
 export function teamColor(teamId: number): string {
   return TEAM_COLORS[(((teamId - 1) % TEAM_COLORS.length) + TEAM_COLORS.length) % TEAM_COLORS.length];
 }
+
+// ───────────── 예약 선택(드래그) ─────────────
+
+/** 해당 방에서 [startSlot, endSlot) 구간이 기존 예약과 겹치는가. */
+export function hasOverlap(
+  reservations: GridReservation[],
+  roomId: number,
+  startSlot: number,
+  endSlot: number,
+): boolean {
+  return reservations.some((r) => r.roomId === roomId && r.startSlot < endSlot && startSlot < r.endSlot);
+}
+
+/**
+ * 드래그 시작 칸(anchor)에서 현재 칸(target)까지 선택 범위를 구하되, 막힌 칸(지난 칸·예약된 칸)을
+ * 만나면 그 직전에서 멈춘다. 반환값은 [start, end) 슬롯 구간.
+ */
+export function clampSelection(
+  anchor: number,
+  target: number,
+  isBlocked: (slot: number) => boolean,
+): { start: number; end: number } {
+  const step = target >= anchor ? 1 : -1;
+  let last = anchor;
+  for (let slot = anchor + step; step > 0 ? slot <= target : slot >= target; slot += step) {
+    if (isBlocked(slot)) break;
+    last = slot;
+  }
+  return { start: Math.min(anchor, last), end: Math.max(anchor, last) + 1 };
+}
+
+/** 예약 창을 열 때의 기본 종료 슬롯: 시작 + 1시간, 단 마감(18)과 같은 방의 다음 예약 앞까지. */
+export function defaultEndSlot(
+  reservations: GridReservation[],
+  roomId: number,
+  startSlot: number,
+  durationSlots = 2,
+): number {
+  const nextStart = reservations
+    .filter((r) => r.roomId === roomId && r.startSlot > startSlot)
+    .reduce((min, r) => Math.min(min, r.startSlot), SLOT_COUNT);
+  return Math.min(startSlot + durationSlots, nextStart, SLOT_COUNT);
+}

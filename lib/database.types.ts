@@ -170,7 +170,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      create_reservation: {
+        Args: {
+          p_attendee_ids: string[]
+          p_date: string
+          p_end_slot: number
+          p_room_id: number
+          p_start_slot: number
+          p_title: string
+        }
+        Returns: string
+      }
     }
     Enums: {
       [_ in never]: never

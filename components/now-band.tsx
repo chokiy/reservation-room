@@ -1,3 +1,5 @@
+"use client";
+
 import type { Room } from "@/lib/data/schedule";
 import type { RoomStatus } from "@/lib/grid";
 
@@ -6,11 +8,14 @@ export function NowBand({
   isToday,
   rooms,
   statuses,
+  onPick,
 }: {
   isToday: boolean;
   rooms: Room[];
   /** 영업시간 밖이면 null */
   statuses: RoomStatus[] | null;
+  /** 비어 있는 방 칩을 눌렀을 때(원탭 예약) */
+  onPick: (roomId: number) => void;
 }) {
   if (!isToday) {
     return (
@@ -38,12 +43,14 @@ export function NowBand({
         <span className="text-zinc-600">비어 있는 방이 없습니다.</span>
       ) : (
         freeRooms.map((s) => (
-          <span
+          <button
             key={s.roomId}
-            className="rounded-full border border-green-600 bg-white px-3 py-0.5 text-[13px] text-green-700"
+            type="button"
+            onClick={() => onPick(s.roomId)}
+            className="rounded-full border border-green-600 bg-white px-3 py-0.5 text-[13px] text-green-700 hover:bg-green-600 hover:text-white"
           >
             {roomName.get(s.roomId)}
-          </span>
+          </button>
         ))
       )}
     </div>
